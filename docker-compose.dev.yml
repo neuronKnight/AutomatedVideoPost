@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  n8n:
+    build:
+      context: ./docker/n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT}:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+    environment:
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL}
+      - N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=${N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE}
+    networks:
+      - automation-network
+
+  idea-generator:
+    build:
+      context: ./services/idea-generator
+    restart: unless-stopped
+    ports:
+      - "${IDEA_GENERATOR_PORT}:3030"
+    environment:
+      - DEBUG=${DEBUG}
+    networks:
+      - automation-network
+      
+  video-generator:
+    build:
+      context: ./services/video-generator
+    restart: unless-stopped
+    ports:
+      - "${VIDEO_GENERATOR_PORT}:3031"
+    environment:
+      - DEBUG=${DEBUG}
+      - MPT_API=http://moneyprinter:${MONEYPRINTER_API_PORT}/api/v1
+    volumes:
+      - shared-media:/app/media
+    depends_on:
+      - moneyprinter
+    networks:
+      - automation-network
+      
+  moneyprinter:
+    build:
+      context: ./MoneyPrinterTurbo
+    restart: unless-stopped
+    ports:
+      - "${MONEYPRINTER_API_PORT}:8080"
+      - "${MONEYPRINTER_UI_PORT}:8501"
+    volumes:
+      - ./config/moneyprinter:/app/config
+      - shared-media:/app/media
+    environment:
+      - DEBUG=${DEBUG}
+      - AI_PROVIDER=${AI_PROVIDER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - automation-network
+
+      
+  social-publisher:
+    build:
+      context: ./services/social-publisher
+    restart: unless-stopped
+    ports:
+      - "${SOCIAL_PUBLISHER_PORT}:3032"
+    volumes:
+      - ./lib/social-auto-upload:/app/social-auto-upload
+      - shared-media:/app/media
+    environment:
+      - DEBUG=${DEBUG}
+      - SOCIAL_AUTO_UPLOAD_PATH=/app/social-auto-upload
+    networks:
+      - automation-network
+
+networks:
+  automation-network:
+    driver: bridge
+    
+volumes:
+  n8n_data:
+  shared-media:
+    driver: local
